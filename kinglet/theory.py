@@ -212,7 +212,6 @@ def strokes_from_text(text):
     leftover_text = re.sub(r'([A-Z])', lambda m: '|' + m.group(1).lower(), leftover_text)
     stroke_list = []
     part_list = []
-    stroke = Stroke()
     while len(leftover_text) > 0:
         # Find candidate parts.
         combo_list = []
@@ -224,7 +223,8 @@ def strokes_from_text(text):
             return ()
         # First try to extend current stroke.
         part = None
-        if stroke:
+        if stroke_list:
+            stroke = stroke_list[-1]
             for combo in combo_list:
                 if stroke.is_prefix(combo):
                     # Check if we're not changing the translation.
@@ -232,22 +232,18 @@ def strokes_from_text(text):
                     result = (stroke + combo).to_text()
                     if wanted != result:
                         continue
-                    stroke += combo
+                    stroke_list[-1] += combo
                     part = COMBOS[combo]
                     part_list[-1] += part
                     break
         # Start a new stroke
         if part is None:
-            if stroke:
-                stroke_list.append(stroke)
             combo = combo_list[0]
-            stroke = combo
+            stroke_list.append(combo)
             part = COMBOS[combo]
             part_list.append(part)
         assert len(part) > 0
         leftover_text = leftover_text[len(part):]
-    if stroke:
-        stroke_list.append(stroke)
     assert len(stroke_list) == len(part_list)
     return stroke_list
 
