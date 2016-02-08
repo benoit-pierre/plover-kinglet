@@ -1,152 +1,216 @@
+# vim: set fileencoding=utf-8 :
 
 import re
 
 from kinglet.system import *
 from kinglet import stroke
 
+from text_table import parse_text_table
+
 
 stroke.setup(KEYS, IMPLICIT_HYPHEN_KEYS)
 
 # System keymap, used for one letter strokes.
 SYSTEM_KEYMAP = {
-    '2': u'2', '3': u'3', '4': u'4', '5': u'5', '6': u'6', '7': u'7', '8': u'8', '9': u'9',
-    'W': u'w', 'E': u'e', 'R': u'r', 'T': u't', 'Y': u'y', 'U': u'u', 'I': u'i', 'O': u'o',
-    'S': u's', 'D': u'd', 'F': u'f', 'G': u'g', 'H': u'h', 'J': u'j', 'K': u'k', 'L': u'l',
+    '1': u'1', '2': u'2', '3': u'3', '4': u'4', '5': u'5', '6': u'6', '7': u'7', '8': u'8', '9': u'9', '0': u'0',
+    'Q': u'q', 'W': u'w', 'E': u'e', 'R': u'r', 'T': u't', 'Y': u'y', 'U': u'u', 'I': u'i', 'O': u'o', 'P': u'p',
+    'A': u'a', 'S': u's', 'D': u'd', 'F': u'f', 'G': u'g', 'H': u'h', 'J': u'j', 'K': u'k', 'L': u'l', ';': u';',
     'X': u'x', 'C': u'c', 'V': u'v', 'B': u'b', 'N': u'n', 'M': u'm', ',': u',',
     '_': u' ',
 }
 
+KEY_PRESSED = u'■'
+KEY_RELEASED = u'□'
+
+SPACE_CHAR = u'_'
+
+def parse_combos(cluster, key_mapping):
+    key_mapping = ''.join(key_mapping.strip().split())
+    combos = {}
+    for row in parse_text_table(cluster):
+        assert 0 == (len(row) % 2)
+        for c in range(0, len(row), 2):
+            text = row[c].strip().replace(SPACE_CHAR, u' ')
+            keys = []
+            for n, char in enumerate(u''.join(l.strip() for l in row[c + 1])):
+                assert char in (u'\n', u' ', KEY_PRESSED, KEY_RELEASED)
+                if char == KEY_PRESSED:
+                    keys.append(key_mapping[n])
+            keys.sort()
+            keys = u''.join(keys)
+            assert keys, u'invalid empty combo for %s' % text
+            assert text not in combos, u'combo mapped multiple times: %s and %s' % (text, combos[keys])
+            combos[keys] = text
+    return combos
+
+'''
+Use the following in VIM to make editing clusters easier:
+
+pyfile misc/vim_toggle_on_off.py
+nmap <buffer> <space> :python toggle_on_off()<CR>
+nnoremap <buffer> <RightMouse> <LeftMouse>:python toggle_on_off()<CR>
+'''
+
 # Thumbs clusters.
-THUMB_CLUSTER_COMBOS = {
-    # 2345678
-    #    1
-    '1   ': u' ',
-    '5   ': u'a',
-    '3456': u'b',
-    '45  ': u'c',
-    '37  ': u'd',
-    '4   ': u'e',
-    '345 ': u'f',
-    '467 ': u'g',
-    '47  ': u'h',
-    '7   ': u'i',
-    '678 ': u'j',
-    '256 ': u'k',
-    '57  ': u'l',
-    '67  ': u'm',
-    '46  ': u'n',
-    '3   ': u'o',
-    '567 ': u'p',
-    '267 ': u'q',
-    '35  ': u'r',
-    '36  ': u's',
-    '6   ': u't',
-    '34  ': u'u',
-    '68  ': u'v',
-    '356 ': u'w',
-    '234 ': u'x',
-    '457 ': u'y',
-    '348 ': u'z',
-    '347 ': u'an',
-    '2   ': u'at',
-    '8   ': u'en',
-    '367 ': u'er',
-    '456 ': u'he',
-    '346 ': u'in',
-    '26  ': u'nd',
-    '3467': u'on',
-    '27  ': u'or',
-    '4567': u're',
-    '38  ': u'te',
-    '56  ': u'th',
-    '48  ': u'ti',
-    '568 ': u'-',
-    '23  ': u'!',
-    '245 ': u'"',
-    '25  ': u',',
-    '58  ': u'.',
-    '78  ': u'?',
-    '458 ': u'\'',
-    '24  ': u'|', # [cap]
-}
-# Left hand clusters.
-LEFT_CLUSTER_COMBOS = {
-    # 14
-    # 25
-    # 36
-    '6   ': u'a',
-    '235 ': u'b',
-    '26  ': u'c',
-    '24  ': u'd',
-    '2   ': u'e',
-    '1245': u'f',
-    '145 ': u'g',
-    '35  ': u'h',
-    '3   ': u'i',
-    '134 ': u'j',
-    '1236': u'k',
-    '15  ': u'l',
-    '12  ': u'm',
-    '25  ': u'n',
-    '1   ': u'o',
-    '2356': u'p',
-    '146 ': u'q',
-    '36  ': u'r',
-    '14  ': u's',
-    '4   ': u't',
-    '56  ': u'u',
-    '1234': u'v',
-    '356 ': u'w',
-    '16  ': u'x',
-    '256 ': u'y',
-    '346 ': u'z',
-    '125 ': u'an',
-    '1256': u'at',
-    '123 ': u'en',
-    '124 ': u'er',
-    '23  ': u'he',
-    '245 ': u'in',
-    '456 ': u'nd',
-    '2345': u'on',
-    '1456': u'or',
-    '236 ': u're',
-    '3456': u'te',
-    '45  ': u'th',
-    '234 ': u'ti',
-    '34  ': u'-',
-    '136 ': u'!',
-    '46  ': u'"',
-    '156 ': u',',
-    '345 ': u'.',
-    '1346': u'?',
-    '13  ': u'\'',
-    '126 ': u'|', # [cap]
-    '5   ': u' ',
-}
+THUMB_CLUSTER_MAPPING = u'''
+2345678
+   1
+'''
+THUMB_CLUSTER_COMBOS = parse_combos(
+u'''
+
+    a  □□□■□□□    q  ■□□□■■□    nd ■□□□■□□
+          □             □             □
+
+    b  □■■■■□□    r  □■□■□□□    on □■■□■■□
+          □             □             □
+
+    c  □□■■□□□    s  □■□□■□□    or ■□□□□■□
+          □             □             □
+
+    d  □■□□□■□    t  □□□□■□□    re □□■■■■□
+          □             □             □
+
+    e  □□■□□□□    u  □■■□□□□    te □■□□□□■
+          □             □             □
+
+    f  □■■■□□□    v  □□□□■□■    th □□□■■□□
+          □             □             □
+
+    g  □□■□■■□    w  □■□■■□□    ti □□■□□□■
+          □             □             □
+
+    h  □□■□□■□    x  ■■■□□□□    -  □□□■■□■
+          □             □             □
+
+    i  □□□□□■□    y  □□■■□■□    !  ■■□□□□□
+          □             □             □
+
+    j  □□□□■■■    z  □■■□□□■    "  ■□■■□□□
+          □             □             □
+
+    k  ■□□■■□□    an □■■□□■□    ,  ■□□■□□□
+          □             □             □
+
+    l  □□□■□■□    at ■□□□□□□    .  □□□■□□■
+          □             □             □
+
+    m  □□□□■■□    en □□□□□□■    ?  □□□□□■■
+          □             □             □
+
+    n  □□■□■□□    er □■□□■■□    '  □□■■□□■
+          □             □             □
+
+    o  □■□□□□□    he □□■■■□□    |  ■□■□□□□
+          □             □             □
+
+    p  □□□■■■□    in □■■□■□□    _  □□□□□□□
+          □             □             ■
+
+''', THUMB_CLUSTER_MAPPING)
+
+# Left hand outer cluster: third and little fingers.
+LEFT_OUTER_CLUSTER_MAPPING = u'''
+147
+258
+369
+'''
+LEFT_OUTER_CLUSTER_COMBOS = parse_combos(
+u'''
+
+    a  □□□    b  □■□    c  □□■    d  □■■    e  □□■    f  □□□    g  □□□    h  □□■
+       □■■       □■□       □□■       □■□       □□□       □■□       □■□       □■■
+       □□□       □□□       □□□       □□□       □□□       □□□       ■□□       □□□
+
+    i  □□□    j  □□□    k  □□□    l  □□□    m  □□□    n  □□□    o  □■■    p  □■□
+       □□□       ■□□       □□■       □□■       □■■       □□■       □□□       □□□
+       □■■       □□□       ■□■       □■■       □■■       □■□       □□□       □□□
+
+    q  ■□□    r  □□□    s  □□■    t  □□□    u  □■■    v  □□■    w  □■□    x  □□□
+       □□□       □■■       □■□       □□□       □■■       ■□□       ■□□       □□□
+       □□□       □■□       □□□       □□■       □□□       □□□       □□□       ■□■
+
+    y  □□□    z  □□□    an ■■□    at □■□    en □□□    er □□□    he □□■    in □□□
+       ■■□       □□□       □□□       ■■□       □■□       □□□       □■■       □□□
+       □□□       ■□□       □□□       □□□       ■■□       ■■□       □■□       □■□
+
+    nd ■■□    on □□□    or □□□    re □□□    te □□■    th □□□    ti □■□    -  □□□
+       ■□□       ■■□       ■□■       □■□       ■□■       □□■       ■■□       ■□■
+       □□□       ■□□       ■□□       □■□       □□□       □□■       ■□□       □□□
+
+    !  ■□□    "  □□■    ,  ■■□    .  □□□    ?  □□□    '  ■□■    |  □□□    _  □□□
+       ■□□       ■□■       ■■□       ■■□       ■□□       ■□□       □□■       □□■
+       □□□       ■□□       □□□       ■■□       ■□□       □□□       ■□□       □□□
+
+''', LEFT_OUTER_CLUSTER_MAPPING)
+
+# Left hand inner cluster: fore and middle fingers.
+LEFT_INNER_CLUSTER_MAPPING = u'''
+14
+25
+36
+'''
+LEFT_INNER_CLUSTER_COMBOS = parse_combos(
+u'''
+
+    a  ■□    b  ■□    c  ■■    d  □□    e  □□    f  □□    g  ■□    h  □□
+       □□       ■□       □□       ■□       ■□       ■■       ■□       □□
+       □□       ■■       □□       □■       □□       □■       □■       ■□
+
+    i  ■□    j  □■    k  □□    l  ■□    m  ■■    n  □□    o  □■    p  ■□
+       ■□       □■       ■■       □■       ■■       □■       □■       □■
+       □□       ■□       ■□       □□       □□       □■       □□       □■
+
+    q  □■    r  □□    s  □□    t  □■    u  ■■    v  □■    w  □□    x  ■■
+       □■       □□       ■□       □□       □■       ■□       □□       ■□
+       ■■       □■       ■□       □□       □□       □□       ■■       ■□
+
+    y  □□    z  □■    an ■■    at ■□    en ■□    er □□    he ■□    in ■□
+       ■□       □□       □■       □□       ■□       ■■       ■■       ■■
+       ■■       ■□       □■       ■■       ■□       ■■       □□       □■
+
+    nd □■    on ■■    or □■    re ■□    te □□    th □□    ti ■□    -  □■
+       □■       □□       ■■       □□       □■       ■■       □□       ■□
+       □■       □■       □□       □■       ■□       □□       ■□       ■□
+
+    !  ■■    "  □■    ,  □■    .  ■■    ?  □■    '  □□    |  ■■    _  □□
+       □□       ■■       □□       □□       □□       □■       ■□       □■
+       ■□       ■□       □■       ■■       ■■       ■■       □□       □□
+
+''', LEFT_INNER_CLUSTER_MAPPING)
+
 # Right hand clusters are mirrored from the left hand.
-# 14    41
-# 25 -> 52
-# 36    63
-RIGHT_CLUSTER_COMBOS = {}
-for combo, translation in LEFT_CLUSTER_COMBOS.items():
-    combo = [' ' if ' ' == c else
-             str((int(c) - 1 + 3) % 6 + 1)
-             for c in combo]
-    combo.sort()
-    combo = ''.join(combo)
-    RIGHT_CLUSTER_COMBOS[combo] = translation
+def mirror_combos(base_combos, mapping):
+    transform = {}
+    for row in mapping.strip().split('\n'):
+        for n, k in enumerate(row.strip()):
+            transform[k] = row[len(row) - (n + 1)]
+    mirrored_combos = {}
+    for combo, translation in base_combos.items():
+        combo = [transform[c] for c in combo]
+        combo.sort()
+        combo = ''.join(combo)
+        mirrored_combos[combo] = translation
+    return mirrored_combos
+
+# 147 14    41 741
+# 258 25 -> 52 852
+# 369 36    63 963
+RIGHT_INNER_CLUSTER_COMBOS = mirror_combos(LEFT_INNER_CLUSTER_COMBOS, LEFT_INNER_CLUSTER_MAPPING)
+RIGHT_OUTER_CLUSTER_COMBOS = mirror_combos(LEFT_OUTER_CLUSTER_COMBOS, LEFT_OUTER_CLUSTER_MAPPING)
+
 # Final list of all clusters.
 CLUSTERS = (
     # Left third and little fingers.
-    (6, LEFT_CLUSTER_COMBOS),
+    (9, LEFT_OUTER_CLUSTER_COMBOS),
     # Left fore and middle fingers.
-    (6, LEFT_CLUSTER_COMBOS),
+    (6, LEFT_INNER_CLUSTER_COMBOS),
     # Thumbs.
     (8, THUMB_CLUSTER_COMBOS),
     # Right fore and middle fingers.
-    (6, RIGHT_CLUSTER_COMBOS),
+    (6, RIGHT_INNER_CLUSTER_COMBOS),
     # Right third and little fingers.
-    (6, RIGHT_CLUSTER_COMBOS),
+    (9, RIGHT_OUTER_CLUSTER_COMBOS),
 )
 
 COMBOS = {}
