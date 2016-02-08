@@ -83,6 +83,10 @@ class Stroke(integer_type):
             return cls.from_steno(value)
         return cls.from_keys(value)
 
+    def __contains__(self, other):
+        ov = integer_type(Stroke(other))
+        return ov == integer_type(self) & ov
+
     def __or__(self, other):
         return self.from_integer(integer_type(self) | integer_type(Stroke(other)))
 
